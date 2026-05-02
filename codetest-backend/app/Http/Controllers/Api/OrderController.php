@@ -3,50 +3,63 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Services\OrderService;
-use App\Http\Resources\OrderResource;
 use App\Models\Order;
 use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class OrderController extends Controller
 {
-
-
-
     public function store(Request $request)
     {
         $request->validate([
             'products' => 'required|array',
-            'products.*.product_id' => 'required|exists:products,id',
+            'products.*.product_id' => 'required|integer',
             'products.*.qty' => 'required|integer|min:1'
         ]);
 
-        $totalPrice = 0;
+        try {
+            return DB::transaction(function () use ($request) {
 
-        foreach ($request->products as $item) {
-            $product = Product::find($item['product_id']);
+                $productIds = collect($request->products)->pluck('product_id');
+                $products = Product::whereIn('id', $productIds)->get()->keyBy('id');
 
-            if (!$product) {
+                foreach ($request->products as $item) {
+                    if (!$products->has($item['product_id'])) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'Product not found',
+                            'errors' => [
+                                'product_id' => $item['product_id']
+                            ]
+                        ], 404);
+                    }
+                }
+
+                $totalPrice = 0;
+
+                foreach ($request->products as $item) {
+                    $product = $products[$item['product_id']];
+                    $totalPrice += $product->price * $item['qty'];
+                }
+
+                $order = Order::create([
+                    'user_id' => Auth::id(),
+                    'total_price' => $totalPrice
+                ]);
+
                 return response()->json([
-                    'message' => "Product not found"
-                ], 404);
-            }
+                    'success' => true,
+                    'message' => 'Order created successfully',
+                    'data' => $order
+                ], 201);
+            });
 
-            $totalPrice += $product->price * $item['qty'];
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Something went wrong'
+            ], 500);
         }
-
-        $order = Order::create([
-            'user_id' => Auth::id(),
-            'total_price' => $totalPrice
-        ]);
-
-        return response()->json([
-            'message' => 'Order created successfully',
-            'order' => $order
-        ]);
-    }
-
-
-}
+    }}

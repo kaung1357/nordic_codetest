@@ -54,6 +54,7 @@
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+        <!-- Products Catalog -->
         <div class="lg:col-span-2">
           <h2 class="text-2xl font-extrabold flex items-center text-gray-800 mb-6">
             <span class="bg-blue-600 w-2 h-8 rounded-full mr-3"></span>
@@ -76,7 +77,7 @@
             >
               <div class="mb-5">
                 <h3
-                  class="font-bold text-lg text-gray-800 group-hover:text-blue-600 transition-colors"
+                  class="font-bold text-lg text-gray-800 group-hover:text-blue-600 transition-colors uppercase italic tracking-wider"
                 >
                   {{ p.name }}
                 </h3>
@@ -88,31 +89,14 @@
                 @click="addToCart(p)"
                 class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-2 shadow-md active:scale-95"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  class="h-5 w-5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                  />
-                </svg>
                 Add to Cart
               </button>
             </div>
           </div>
         </div>
 
+        <!-- Checkout / Cart Section -->
         <div class="lg:sticky lg:top-6">
-          <h2 class="text-2xl font-extrabold flex items-center text-gray-800 mb-6 lg:invisible">
-            Cart Placeholder
-          </h2>
-
           <div class="bg-white p-6 rounded-3xl shadow-2xl border border-gray-50">
             <div class="flex justify-between items-center mb-6 border-b pb-4">
               <h3 class="text-xl font-bold text-gray-800">Your Cart</h3>
@@ -132,7 +116,7 @@
                 class="bg-gray-50 p-4 rounded-2xl border border-gray-100"
               >
                 <div class="flex justify-between items-start mb-3">
-                  <span class="font-bold text-gray-700 leading-tight">{{ c.name }}</span>
+                  <span class="font-bold text-gray-700 leading-tight uppercase">{{ c.name }}</span>
                   <span class="font-bold text-gray-900">${{ (c.price * c.qty).toFixed(2) }}</span>
                 </div>
                 <div class="flex items-center justify-between">
@@ -165,7 +149,7 @@
 
             <div v-if="cart.length > 0" class="border-t border-dashed pt-4 mt-6">
               <div class="flex justify-between items-center mb-6">
-                <span class="text-gray-500 font-semibold">Total:</span>
+                <span class="text-gray-500 font-semibold">Total Amount:</span>
                 <span class="text-2xl font-black text-blue-600 font-mono"
                   >${{ totalPrice.toFixed(2) }}</span
                 >
@@ -175,28 +159,31 @@
             <transition name="fade">
               <div
                 v-if="error"
-                class="mb-4 p-3 bg-red-50 text-red-600 text-xs rounded-xl border border-red-100 text-center"
+                class="mb-4 p-4 bg-red-50 text-red-700 text-sm rounded-xl border-l-4 border-red-500 flex items-start gap-2 shadow-sm"
               >
-                {{ error }}
+                <span>⚠️</span>
+                <span>{{ error }}</span>
               </div>
             </transition>
+
             <transition name="fade">
               <div
                 v-if="success"
-                class="mb-4 p-3 bg-green-50 text-green-600 text-xs rounded-xl border border-green-100 text-center"
+                class="mb-4 p-4 bg-green-50 text-green-700 text-sm rounded-xl border-l-4 border-green-500 flex items-start gap-2 shadow-sm"
               >
-                {{ success }}
+                <span>✅</span>
+                <span>{{ success }}</span>
               </div>
             </transition>
 
             <button
               @click="placeOrder"
               :disabled="orderLoading || cart.length === 0"
-              class="w-full py-4 rounded-2xl font-bold shadow-lg transition-all active:scale-[0.98] disabled:opacity-50"
+              class="w-full py-4 rounded-2xl font-bold shadow-lg transition-all active:scale-[0.98] disabled:opacity-50 flex justify-center items-center gap-2"
               :class="success ? 'bg-green-600 text-white' : 'bg-gray-900 text-white hover:bg-black'"
             >
-              <span v-if="orderLoading">Processing...</span>
-              <span v-else-if="success">🎉 Success!</span>
+              <span v-if="orderLoading" class="animate-pulse">Processing Order...</span>
+              <span v-else-if="success">🎉 Order Placed!</span>
               <span v-else>Place Order Now</span>
             </button>
           </div>
@@ -234,16 +221,19 @@ export default {
   methods: {
     async fetchProducts() {
       this.loading = true
+      this.error = ''
       try {
         const res = await api.get('/products')
-        this.products = res.data
+        this.products = res.data.data
       } catch (err) {
-        this.error = 'Failed to load products.'
+        this.error = 'Failed to load products. Check your connection.'
       } finally {
         this.loading = false
       }
     },
     addToCart(product) {
+      this.error = ''
+      this.success = ''
       const existing = this.cart.find((i) => i.product_id === product.id)
       if (existing) {
         existing.qty++
@@ -255,9 +245,9 @@ export default {
           qty: 1,
         })
       }
-      this.success = ''
     },
     updateQty(id, chg) {
+      this.error = ''
       const item = this.cart.find((i) => i.product_id === id)
       if (item) {
         item.qty += chg
@@ -269,18 +259,29 @@ export default {
     },
     async placeOrder() {
       if (this.cart.length === 0) return
+
       this.orderLoading = true
       this.error = ''
       this.success = ''
+
       try {
         const orderData = {
           products: this.cart.map((i) => ({ product_id: i.product_id, qty: i.qty })),
         }
-        await api.post('/orders', orderData)
-        this.success = 'Order placed successfully!'
+
+        // const orderData = {
+        //   products: this.cart.map((i) => ({
+        //     product_id: 999999,
+        //     qty: i.qty,
+        //   })),
+        // }
+
+        const res = await api.post('/orders', orderData)
+
+        this.success = 'Order placed successfully! Thank you.'
         this.cart = []
       } catch (err) {
-        this.error = 'Order failed. Please try again.'
+        this.error = err.response?.data?.message || 'Order failed'
       } finally {
         this.orderLoading = false
       }
@@ -289,7 +290,7 @@ export default {
       if (confirm('Are you sure you want to logout?')) {
         localStorage.removeItem('token')
         delete api.defaults.headers.common['Authorization']
-        this.$router.push('/login')
+        this.$router.push('/')
       }
     },
   },
@@ -299,17 +300,18 @@ export default {
 <style scoped>
 .fade-enter-active,
 .fade-leave-active {
-  transition: opacity 0.3s;
+  transition: all 0.4s ease;
 }
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+  transform: translateY(-10px);
 }
 .custom-scroll::-webkit-scrollbar {
   width: 4px;
 }
 .custom-scroll::-webkit-scrollbar-thumb {
-  background: #e2e8f0;
+  background: #cbd5e1;
   border-radius: 10px;
 }
 </style>

@@ -9,9 +9,14 @@ class ProductController extends Controller
 {
 
     public function index()
-    {
-        return Product::all();
-    }
+{
+    $products = Product::all();
 
+    return response()->json([
+        'status'  => 'success',
+        'message' => 'Products retrieved successfully',
+        'data'    => $products
+    ], 200);
+}
 
 }
